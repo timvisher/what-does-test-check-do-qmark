@@ -134,3 +134,45 @@
 (defspec straight-flush-hands
   (prop/for-all [straight-flush-cards straight-flush-gen]
                 (= straight-flush? (hand straight-flush-cards))))
+
+(def quadruplet-ranks-gen
+  (gen/bind rank-gen
+            (fn [rank]
+              (gen/vector (gen/return rank) 4))))
+
+(def four-of-a-kind-ranks-gen
+  (gen/such-that (fn [ranks]
+                   (apply not= ranks))
+                 (gen/fmap (fn [[quadruplet-ranks rank]]
+                             (into quadruplet-ranks [rank]))
+                           (gen/tuple quadruplet-ranks-gen
+                                      rank-gen))))
+
+(def quadruplet-suits-gen
+  (gen/shuffle (apply vector (suits))))
+
+(defspec test-quadruplet-suits-gen
+  (prop/for-all [quadruplet-suits quadruplet-suits-gen]
+                (= 4 (count quadruplet-suits))))
+
+(def four-of-a-kind-suits-gen
+  (gen/fmap (fn [[quadruplet-suits suit]]
+              (into quadruplet-suits [suit]))
+            (gen/tuple quadruplet-suits-gen
+                       suit-gen)))
+
+;;; TODO also write using one-of
+(def four-of-a-kind-cards-gen
+  (gen/such-that (fn [cards]
+                   (= 5 (count (apply hash-set cards))))
+                 (gen/fmap (fn [[four-of-a-kind-ranks four-of-a-kind-suits]]
+                             (shuffle
+                              (mapv vector
+                                    four-of-a-kind-ranks
+                                    four-of-a-kind-suits)))
+                           (gen/tuple four-of-a-kind-ranks-gen
+                                      four-of-a-kind-suits-gen))))
+
+(defspec test-four-of-a-kind-cards-gen
+  (prop/for-all [four-of-a-kind-cards four-of-a-kind-cards-gen]
+                (= four-of-a-kind? (hand four-of-a-kind-cards))))
