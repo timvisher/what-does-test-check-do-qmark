@@ -122,7 +122,7 @@
   (and (= 5 (count hand))
        (every? card? hand)))
 
-(defn high-quartet [cards]
+(defn high-quadruplet [cards]
   (let [partitioned-cards (partition-cards cards)]
     (some (fn [card-partition]
             (if (= 4 (count card-partition))
@@ -156,7 +156,7 @@
         high-pair "high pair"
         low-pair "low pair"
         high-triplet "high triplet"
-        high-quartet "high quartet"}
+        high-quadruplet "high quadruplet"}
        component-fn))
 
 (defn hand->ranking-fns []
@@ -167,7 +167,7 @@
    [straight?        [high-card]]
    [flush?           [high-card]]
    [full-house?      [high-triplet high-pair]]
-   [four-of-a-kind?  [high-quartet high-card]]
+   [four-of-a-kind?  [high-quadruplet high-card]]
    [straight-flush?  [high-card]]])
 
 (defn hand-rank [hand]
