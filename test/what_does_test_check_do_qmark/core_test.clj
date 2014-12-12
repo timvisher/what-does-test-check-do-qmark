@@ -92,9 +92,10 @@
 (def straight-flush-gen
   (gen/fmap (fn [straight-ranks]
               (let [suit (random-suit)]
-                (mapv (fn [rank]
-                        [rank suit])
-                      straight-ranks)))
+                (shuffle
+                 (mapv (fn [rank]
+                         [rank suit])
+                       straight-ranks))))
             straight-ranks-gen))
 
 (def heterogenous-suits-gen
@@ -116,9 +117,10 @@
 
 (def straight-gen
   (gen/fmap (fn [[straight-ranks straight-suits]]
-              (mapv vector
-                    straight-ranks
-                    straight-suits))
+              (shuffle
+               (mapv vector
+                     straight-ranks
+                     straight-suits)))
             (gen/tuple straight-ranks-gen
                        straight-suits-gen)))
 
@@ -131,7 +133,7 @@
 ;;; random high-level data that then get's filtered down to what
 ;;; you're looking for.
 
-(defspec straight-flush-hands
+(defspec test-straight-flush-hands
   (prop/for-all [straight-flush-cards straight-flush-gen]
                 (= straight-flush? (hand straight-flush-cards))))
 
@@ -176,3 +178,20 @@
 (defspec test-four-of-a-kind-cards-gen
   (prop/for-all [four-of-a-kind-cards four-of-a-kind-cards-gen]
                 (= four-of-a-kind? (hand four-of-a-kind-cards))))
+
+(def straight-flush-vs-four-of-a-kind-gen
+  (gen/such-that (fn [[{w-cards :cards} {b-cards :cards}]]
+                   (= 10 (count (apply hash-set (into w-cards b-cards)))))
+                 (gen/fmap (fn [[straight-flush-cards four-of-a-kind-cards]]
+                             [{:color "White" :cards straight-flush-cards}
+                              {:color "Black" :cards four-of-a-kind-cards}])
+                           (gen/tuple straight-flush-gen
+                                      four-of-a-kind-cards-gen))))
+
+;;; TODO This probably can be written in a more generic fashion by
+;;; assembling a generator right here using something like gen/tuple,
+;;; rather than the made for purpose generator above. See if you can
+;;; do that.
+(defspec test-straight-flush-vs-four-of-a-kind
+  (prop/for-all [[sf-player foac-player] straight-flush-vs-four-of-a-kind-gen]
+                (= "White wins. with straight flush" (winner sf-player foac-player))))
