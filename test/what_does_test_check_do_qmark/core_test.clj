@@ -70,7 +70,7 @@
   (prop/for-all [game game-gen-2]
                 (apply winner game)))
 
-(defn random-consecutive-cards []
+(defn random-consecutive-ranks []
   (map ordinal->rank (take 5 (range (rand-int (rank->ordinal \J)) (+ 1 (rank->ordinal \A))))))
 
 (defn random-suit []
@@ -89,6 +89,48 @@
               (mapv ordinal->rank straight-ordinal-ranks))
             straight-ordinal-ranks-gen))
 
-(def consecutive-cards-gen
-  (gen/return (random-consecutive-cards)))
+(def straight-flush-gen
+  (gen/fmap (fn [straight-ranks]
+              (let [suit (random-suit)]
+                (mapv (fn [rank]
+                        [rank suit])
+                      straight-ranks)))
+            straight-ranks-gen))
 
+(def heterogenous-suits-gen
+  (gen/such-that (fn [suits] (apply not= suits))
+                 (gen/vector suit-gen 2)))
+
+(defspec test-heterogenous-suits-gen
+  (prop/for-all [heterogenous-suits heterogenous-suits-gen]
+                (apply not= heterogenous-suits)))
+
+(def straight-suits-gen
+  (gen/fmap (fn [heterogenous-suits]
+              (into heterogenous-suits (repeatedly 3 random-suit)))
+            heterogenous-suits-gen))
+
+(defspec test-straight-suits-gen
+  (prop/for-all [straight-suits straight-suits-gen]
+                (apply not= straight-suits)))
+
+(def straight-gen
+  (gen/fmap (fn [[straight-ranks straight-suits]]
+              (mapv vector
+                    straight-ranks
+                    straight-suits))
+            (gen/tuple straight-ranks-gen
+                       straight-suits-gen)))
+
+(defspec test-straight-hands
+  (prop/for-all [straight-cards straight-gen]
+                (= straight? (hand straight-cards))))
+
+;;; So far, it seems like it's always better to build up from known
+;;; primitives towards the state you're looking for than to generate
+;;; random high-level data that then get's filtered down to what
+;;; you're looking for.
+
+(defspec straight-flush-hands
+  (prop/for-all [straight-flush-cards straight-flush-gen]
+                (= straight-flush? (hand straight-flush-cards))))
