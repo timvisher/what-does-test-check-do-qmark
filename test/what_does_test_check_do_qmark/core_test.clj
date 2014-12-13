@@ -195,3 +195,27 @@
 (defspec test-straight-flush-vs-four-of-a-kind
   (prop/for-all [[sf-player foac-player] straight-flush-vs-four-of-a-kind-gen]
                 (= "White wins. with straight flush" (winner sf-player foac-player))))
+
+(def four-of-a-kind-cards-gen-2
+  (gen/fmap (fn [deck]
+              (let [quadruplet (rand-nth (partition-by first (sort-by (comp rank->ordinal first) deck)))
+                    other-card (take 1 (filter (complement (apply hash-set quadruplet)) deck))]
+                (shuffle (into (apply vector quadruplet) other-card))))
+            deck-gen))
+
+;;; An example of a parameterized generator
+;;;
+;;; The idea here would be to use this when you needed to reference
+;;; the same deck. I'm trying to figure out how to avoid gen/such-that
+(defn four-of-a-kind-cards-gen-3
+  ([]
+   (four-of-a-kind-cards-gen-3 1))
+  ([num-hands]
+   (gen/fmap (fn [deck]
+               (let [quadruplets (repeatedly num-hands (partial rand-nth (partition-by first (sort-by (comp rank->ordinal first) deck))))
+                     other-cards (take num-hands (filter (complement (reduce into #{} quadruplets)) deck))]
+                 (mapv (fn [quadruplet card]
+                         (into (apply vector quadruplet) [card]))
+                       quadruplets
+                       other-cards)))
+             deck-gen)))
