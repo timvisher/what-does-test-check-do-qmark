@@ -230,3 +230,108 @@
 (defspec test-deck-gen-2-count
   (prop/for-all [deck (deck-gen-2 #{})]
                 (= 52 (count deck))))
+
+(defn straight-flush-from-deck [deck]
+  (->> deck
+       (sort-by (juxt second (comp rank->ordinal first)))
+       (partition-by second)
+       rand-nth
+       (partition-all 5 1)
+       (filter (fn [part] (= 5 (count part))))
+       rand-nth))
+
+(defn straight-flush-gen-2 [the-deck-gen]
+  (gen/bind the-deck-gen
+            (fn [deck]
+              (gen/return (straight-flush-from-deck deck)))))
+
+(defn quadruplet-from-deck [deck]
+   (->> deck
+        (sort-by (comp rank->ordinal first))
+        (partition-by first)
+        (filter (fn [part] (= 4 (count part))))
+        rand-nth))
+
+(defn cards-from-deck [n deck]
+  (take n deck))
+
+(defn remove-cards [cards deck]
+  (filter (complement (apply hash-set cards)) deck))
+
+(defn four-of-a-kind-from-deck [deck]
+  (let [quadruplet (quadruplet-from-deck deck)
+        other-card (cards-from-deck 1 (remove-cards quadruplet deck))]
+    (shuffle (into quadruplet other-card))))
+
+(defn four-of-a-kind-gen [the-deck-gen]
+  (gen/bind the-deck-gen
+            (fn [deck]
+              (gen/return (four-of-a-kind-from-deck deck)))))
+
+(defspec test-four-of-a-kind-gen-2
+  (prop/for-all [four-of-a-kind (four-of-a-kind-gen (deck-gen-2 #{}))]
+                (= four-of-a-kind? (hand four-of-a-kind))))
+
+(defn triplet-from-deck [deck]
+  (->> deck
+       (sort-by (comp rank->ordinal first))
+       (partition-by first)
+       (filter (fn [part] (<= 3 (count part))))
+       rand-nth
+       (take 3)))
+
+(defn pair-from-deck [deck]
+  (->> deck
+       (sort-by (comp rank->ordinal first))
+       (partition-by first)
+       (filter (fn [part] (<= 2 (count part))))
+       rand-nth
+       (take 2)))
+
+(defn full-house-from-deck [deck]
+  (let [triplet (triplet-from-deck deck)
+        pair (pair-from-deck (remove-cards triplet deck))]
+    (shuffle (into triplet pair))))
+
+(defn full-house-gen [the-deck-gen]
+  (gen/bind the-deck-gen
+            (fn [deck]
+              (gen/return (full-house-from-deck deck)))))
+
+(defspec test-full-house-gen
+  (prop/for-all [full-house (full-house-gen (deck-gen-2 #{}))]
+                (= full-house? (hand full-house))))
+
+(defspec test-full-house-gen-count
+  (prop/for-all [full-house (full-house-gen (deck-gen-2 #{}))]
+                (= 5 (count full-house))))
+
+(defn game-gen-3 [white-gens black-gens]
+  (gen/fmap (fn [[w-cards b-cards]]
+              [{:color "White"
+                :cards w-cards}
+               {:color "Black"
+                :cards b-cards}])
+            (gen/bind ((rand-nth white-gens) (deck-gen-2 #{}))
+                      (fn [hand]
+                        (let [deck-gen (deck-gen-2 (apply hash-set hand))
+                              black-gen ((rand-nth black-gens) deck-gen)
+                              _ (def charnock black-gen)
+                              _ (def whitefield deck-gen)]
+                          (gen/tuple (gen/return hand)
+                                     black-gen))))))
+
+;;; fails: black is generated with 4 cards in the hand, one of which
+;;; is always [2 \C]
+;;;
+;;; I take that back. It's only very often there. I've seen one run
+;;; with the [4 \C]
+(defspec test-game-gen-3-valid-hands
+  (prop/for-all [[{w-cards :cards} {b-cards :cards}] (game-gen-3 [straight-flush-gen-2]
+                                                                 [four-of-a-kind-gen full-house-gen])]
+                (= 5 (count w-cards) (count b-cards))))
+
+(defspec test-straight-flush-beats-all
+  (prop/for-all [game (game-gen-3 [straight-flush-gen-2]
+                                  [four-of-a-kind-gen full-house-gen])]
+                (= "White wins. with straight flush" (apply winner game))))
